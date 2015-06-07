@@ -32,8 +32,18 @@ class QuestionMethodTests(TestCase):
         recent_question = Question(pub_date=time)
         self.assertEqual(recent_question.was_published_recently(), True, 'Should return true for a question less than 24 hours old')
 
+def create_question(question_text, days):
+    """
+    Helper method to create a question for testing.
+    :param question_text: the text of the question
+    :param days: the number of days to add to now for the pub_date
+    :return: the created question
+    """
+    time = timezone.now() + datetime.timedelta(days=days)
+    return Question.objects.create(question_text=question_text, pub_date=time)
 
-class QuestionViewTests(TestCase):
+
+class QuestionIndexViewTests(TestCase):
     def test_index_view_with_no_questions(self):
         """
         If no questions exist, an appropriate message should be displayed.
@@ -90,12 +100,20 @@ class QuestionViewTests(TestCase):
         self.assertEqual(len([question for question in response.context['latest_question_list'] if question.question_text == past_question_text_one]), 1)
         self.assertEqual(len([question for question in response.context['latest_question_list'] if question.question_text == past_question_text_two]), 1)
 
-def create_question(question_text, days):
-    """
-    Helper method to create a question for testing.
-    :param question_text: the text of the question
-    :param days: the number of days to add to now for the pub_date
-    :return: the created question
-    """
-    time = timezone.now() + datetime.timedelta(days=days)
-    return Question.objects.create(question_text=question_text, pub_date=time)
+class QuestionDetailViewTests(TestCase):
+
+    def test_detail_view_with_a_future_question(self):
+        """
+        The detail view should not display a question with a future pub_date.
+        """
+        future_question = create_question(question_text='Is this what you expected?', days=1)
+        response = self.client.get(reverse('polls:detail', args=(future_question.id,)))
+        self.assertEqual(response.status_code, 404, 'The question should not be found')
+
+    def test_detail_view_with_a_past_question(self):
+        """
+        The detail view should not display a question with a future pub_date.
+        """
+        past_question = create_question(question_text='Is this what happened?', days=-1)
+        response = self.client.get(reverse('polls:detail', args=(past_question.id,)))
+        self.assertEqual(response.status_code, 200, 'The question should be found')
